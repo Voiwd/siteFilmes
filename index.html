@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Playlist de Filmes</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       background-color: #0d0d0d;
       color: #eee;
@@ -36,13 +34,13 @@
       border-radius: 10px;
       box-shadow: 0 0 10px #000;
     }
-    input, textarea, button {
+    input, textarea, button, select {
       padding: 0.6rem;
       border: none;
       border-radius: 5px;
       font-size: 1rem;
     }
-    input, textarea {
+    input, textarea, select {
       background: #222;
       color: #eee;
     }
@@ -67,6 +65,7 @@
       padding: 1rem;
       text-align: center;
       box-shadow: 0 0 10px #000;
+      position: relative;
     }
     .card img {
       width: 100%;
@@ -81,9 +80,36 @@
       color: #aaa;
       font-size: 0.9rem;
     }
+    .admin-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: red;
+      color: white;
+      text-align: center;
+      padding: 0.5rem;
+      font-weight: bold;
+      display: none;
+      z-index: 1000;
+    }
+    .admin-btn {
+      display: none;
+      margin: 0.3rem;
+      font-size: 0.8rem;
+      background: #e63946;
+    }
+    .admin-active .admin-btn {
+      display: inline-block;
+    }
+    .filter-container {
+      margin: 1rem 0;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
+  <div class="admin-bar" id="adminBar">⚙️ Modo Admin Ativo</div>
   <header>🎬 Playlist de Filmes</header>
 
   <main>
@@ -91,15 +117,26 @@
       <input type="text" id="nome" placeholder="Nome do filme" required />
       <input type="text" id="imagem" placeholder="URL da imagem (opcional)" />
       <textarea id="descricao" rows="3" placeholder="Descrição (opcional)"></textarea>
+      <input type="date" id="lancamento" placeholder="Data de lançamento" />
+      <input type="text" id="adicionadoPor" placeholder="Adicionado por (seu nome)" required />
       <button type="submit">Adicionar Filme</button>
     </form>
+
+    <div class="filter-container">
+      <label for="filtro">Ordenar por: </label>
+      <select id="filtro">
+        <option value="adicao">Data de Adição</option>
+        <option value="lancamento">Data de Lançamento</option>
+        <option value="nome">Nome (A-Z)</option>
+      </select>
+    </div>
 
     <div class="cards" id="listaFilmes"></div>
   </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+    import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDdQ9TMXNYRdlYxgKNaFeLbnFywas8bsas",
@@ -118,35 +155,115 @@
 
     const form = document.getElementById("formFilme");
     const lista = document.getElementById("listaFilmes");
+    const filtro = document.getElementById("filtro");
+    const adminBar = document.getElementById("adminBar");
+    let adminMode = false;
+    let filmes = [];
+
+    // Toggle admin mode
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.altKey && e.key === "0") {
+        adminMode = !adminMode;
+        adminBar.style.display = adminMode ? "block" : "none";
+        renderFilmes();
+      }
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const nome = document.getElementById("nome").value.trim();
       const imagem = document.getElementById("imagem").value.trim() || "https://via.placeholder.com/300x450?text=Sem+Imagem";
       const descricao = document.getElementById("descricao").value.trim();
+      const lancamento = document.getElementById("lancamento").value || "";
+      const adicionadoPor = document.getElementById("adicionadoPor").value.trim() || "Anônimo";
 
       if (!nome) return alert("O nome do filme é obrigatório.");
 
-      await push(filmesRef, { nome, imagem, descricao });
+      await push(filmesRef, {
+        nome,
+        imagem,
+        descricao,
+        lancamento,
+        adicionadoPor,
+        criadoEm: Date.now()
+      });
 
       form.reset();
     });
 
     onValue(filmesRef, (snapshot) => {
-      lista.innerHTML = "";
       const data = snapshot.val();
-      if (!data) return;
-      Object.values(data).forEach(filme => {
+      filmes = data ? Object.entries(data).map(([id, filme]) => ({ id, ...filme })) : [];
+      renderFilmes();
+    });
+
+    filtro.addEventListener("change", renderFilmes);
+
+    function renderFilmes() {
+      lista.innerHTML = "";
+      let filmesOrdenados = [...filmes];
+
+      switch (filtro.value) {
+        case "nome":
+          filmesOrdenados.sort((a, b) => a.nome.localeCompare(b.nome));
+          break;
+        case "lancamento":
+          filmesOrdenados.sort((a, b) => new Date(b.lancamento) - new Date(a.lancamento));
+          break;
+        default:
+          filmesOrdenados.sort((a, b) => b.criadoEm - a.criadoEm);
+      }
+
+      filmesOrdenados.forEach(filme => {
         const card = document.createElement("div");
         card.classList.add("card");
+        if (adminMode) card.classList.add("admin-active");
+
         card.innerHTML = `
           <img src="${filme.imagem}" alt="${filme.nome}" />
           <h3>${filme.nome}</h3>
           ${filme.descricao ? `<p>${filme.descricao}</p>` : ""}
+          ${filme.lancamento ? `<p><b>Lançamento:</b> ${filme.lancamento}</p>` : ""}
+          <p><b>Adicionado por:</b> ${filme.adicionadoPor || "Desconhecido"}</p>
+          ${adminMode ? `
+            <button class="admin-btn" data-id="${filme.id}" data-action="editar">Editar</button>
+            <button class="admin-btn" data-id="${filme.id}" data-action="apagar">Apagar</button>
+          ` : ""}
         `;
         lista.appendChild(card);
       });
-    });
+
+      if (adminMode) {
+        document.querySelectorAll(".admin-btn").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            const id = e.target.dataset.id;
+            const action = e.target.dataset.action;
+            if (action === "apagar") apagarFilme(id);
+            else editarFilme(id);
+          });
+        });
+      }
+    }
+
+    async function apagarFilme(id) {
+      if (!confirm("Tem certeza que quer apagar este filme?")) return;
+      await remove(ref(db, "filmes/" + id));
+    }
+
+    async function editarFilme(id) {
+      const filme = filmes.find(f => f.id === id);
+      if (!filme) return;
+      const novoNome = prompt("Novo nome:", filme.nome);
+      const novaDesc = prompt("Nova descrição:", filme.descricao);
+      const novaImg = prompt("Nova URL da imagem:", filme.imagem);
+      const novoLanc = prompt("Nova data de lançamento (YYYY-MM-DD):", filme.lancamento);
+      await update(ref(db, "filmes/" + id), {
+        nome: novoNome || filme.nome,
+        descricao: novaDesc || filme.descricao,
+        imagem: novaImg || filme.imagem,
+        lancamento: novoLanc || filme.lancamento
+      });
+    }
   </script>
 </body>
 </html>
