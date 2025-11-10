@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playlist de Filmes</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #0d0d0d;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #111;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.5rem;
+      border-bottom: 1px solid #222;
+    }
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      background: #181818;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #000;
+    }
+    input, textarea, button {
+      padding: 0.6rem;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+    input, textarea {
+      background: #222;
+      color: #eee;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0059c1;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .card {
+      background: #181818;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 0 10px #000;
+    }
+    .card img {
+      width: 100%;
+      border-radius: 10px;
+      object-fit: cover;
+      height: 300px;
+    }
+    .card h3 {
+      margin: 0.5rem 0 0.2rem 0;
+    }
+    .card p {
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header>🎬 Playlist de Filmes</header>
+
+  <main>
+    <form id="formFilme">
+      <input type="text" id="nome" placeholder="Nome do filme" required />
+      <input type="text" id="imagem" placeholder="URL da imagem (opcional)" />
+      <textarea id="descricao" rows="3" placeholder="Descrição (opcional)"></textarea>
+      <button type="submit">Adicionar Filme</button>
+    </form>
+
+    <div class="cards" id="listaFilmes"></div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDdQ9TMXNYRdlYxgKNaFeLbnFywas8bsas",
+      authDomain: "playlistfilmes67.firebaseapp.com",
+      projectId: "playlistfilmes67",
+      storageBucket: "playlistfilmes67.firebasestorage.app",
+      messagingSenderId: "586678297203",
+      appId: "1:586678297203:web:432b0c23777138ccfac006",
+      measurementId: "G-FSFFW2JSLB",
+      databaseURL: "https://playlistfilmes67-default-rtdb.firebaseio.com"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const filmesRef = ref(db, "filmes");
+
+    const form = document.getElementById("formFilme");
+    const lista = document.getElementById("listaFilmes");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById("nome").value.trim();
+      const imagem = document.getElementById("imagem").value.trim() || "https://via.placeholder.com/300x450?text=Sem+Imagem";
+      const descricao = document.getElementById("descricao").value.trim();
+
+      if (!nome) return alert("O nome do filme é obrigatório.");
+
+      await push(filmesRef, { nome, imagem, descricao });
+
+      form.reset();
+    });
+
+    onValue(filmesRef, (snapshot) => {
+      lista.innerHTML = "";
+      const data = snapshot.val();
+      if (!data) return;
+      Object.values(data).forEach(filme => {
+        const card = document.createElement("div");
+        card.classList.add("card");
+        card.innerHTML = `
+          <img src="${filme.imagem}" alt="${filme.nome}" />
+          <h3>${filme.nome}</h3>
+          ${filme.descricao ? `<p>${filme.descricao}</p>` : ""}
+        `;
+        lista.appendChild(card);
+      });
+    });
+  </script>
+</body>
+</html>
