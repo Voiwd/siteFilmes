@@ -106,11 +106,65 @@
       margin: 1rem 0;
       text-align: right;
     }
+
+    /* Fade suave pro texto da roleta */
+    #resultadoRoleta {
+      opacity: 0;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      transform: translateY(5px);
+    }
+
+    #resultadoRoleta.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Botão dando uma respirada */
+    #btnRoleta {
+      transition: transform 0.2s ease, background 0.3s ease;
+    }
+    #btnRoleta:active {
+      transform: scale(0.95);
+    }
+
+    /* Animação dos cards quando carregam */
+    .card {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .card.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+
   </style>
 </head>
 <body>
   <div class="admin-bar" id="adminBar">⚙️ Modo Admin Ativo</div>
   <header>🎬 Playlist de Filmes</header>
+
+  <div style="text-align:center; margin-top:1rem;">
+  <button id="btnRoleta" style="
+    padding: 0.8rem 1.2rem;
+    border:none;
+    border-radius:8px;
+    background:#28a745;
+    color:white;
+    font-size:1rem;
+    cursor:pointer;
+  ">
+    🌐 Sortear 
+  </button>
+  <p id="resultadoRoleta" style="margin-top:1rem; font-size:1.2rem; font-weight:bold;"></p>
+  </div>
+
+  <div id="card-filme" style="display:none; opacity:0; transition:0.3s;">
+  <img id="card-img" src="" />
+  <h2 id="card-titulo"></h2>
+  <p id="card-desc"></p>
+  </div>
 
   <main>
     <form id="formFilme">
@@ -133,6 +187,15 @@
 
     <div class="cards" id="listaFilmes"></div>
   </main>
+  <canvas id="confettiCanvas" style="
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  "></canvas>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -231,6 +294,12 @@
           ` : ""}
         `;
         lista.appendChild(card);
+        setTimeout(() => {
+          document.querySelectorAll(".card").forEach(card => {
+            card.classList.add("show");
+          });
+        }, 10);
+
       });
 
       if (adminMode) {
@@ -264,6 +333,81 @@
         lancamento: novoLanc || filme.lancamento
       });
     }
+
+    const btnRoleta = document.getElementById("btnRoleta");
+    const resultadoRoleta = document.getElementById("resultadoRoleta");
+
+    btnRoleta.addEventListener("click", () => {
+      if (filmes.length === 0) {
+        resultadoRoleta.textContent = "Não tem nada pra sortear, chefia.";
+        resultadoRoleta.classList.add("show");
+        return;
+      }
+
+      resultadoRoleta.classList.remove("show");
+      resultadoRoleta.textContent = "Girando...";
+
+      setTimeout(() => {
+        const escolhido = filmes[Math.floor(Math.random() * filmes.length)];
+        resultadoRoleta.innerHTML = `
+          🎬 Filme sorteado: <span>${escolhido.nome}</span>
+        `;
+        resultadoRoleta.classList.add("show");
+
+        // Confetti!
+        spawnConfetti();
+        updateConfetti();
+
+      }, 600);
+    });
+
+
+
+    // Confete simples e bonito
+    const confettiCanvas = document.getElementById("confettiCanvas");
+    const ctx = confettiCanvas.getContext("2d");
+    let confettiParticles = [];
+
+    function resizeCanvas() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    function spawnConfetti() {
+      confettiParticles = [];
+      for (let i = 0; i < 150; i++) {
+        confettiParticles.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * -50,
+          r: Math.random() * 6 + 2,
+          dx: Math.random() * 2 - 1,
+          dy: Math.random() * 3 + 2,
+          color: `hsl(${Math.random() * 360}, 80%, 60%)`
+        });
+      }
+    }
+
+    function updateConfetti() {
+      ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+      confettiParticles.forEach(p => {
+        p.x += p.dx;
+        p.y += p.dy;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      confettiParticles = confettiParticles.filter(p => p.y < window.innerHeight + 50);
+
+      if (confettiParticles.length > 0) {
+        requestAnimationFrame(updateConfetti);
+      }
+    }
+
   </script>
 </body>
 </html>
